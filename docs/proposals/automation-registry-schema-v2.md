@@ -171,9 +171,14 @@ definitions live in research `c1779970` (agent-controller, AC) --
 see the 2026-05-13 L-hierarchy amendment for the canonical role
 spec. Summary:
 
-  - L4 -- gruntwork (coder, qa, playtester)
-  - L5 -- guiding + grading L4s (guide answers mid-work questions;
-          grader evaluates output -- same layer, multiple roles)
+  - L4 -- gruntwork: coder, qa, playtester, AND grader. Grader is
+          a HIGH-COMPUTE L4 (uses a stronger engine like Claude;
+          standard L4s can run on local Ollama). Engine choice is
+          PER-ROLE within the layer, not uniform per-layer.
+  - L5 -- managers + guides. Every L4 has an L5 manager (same as
+          any worker has a manager). L5 guides L4s, answers their
+          questions, handles dialog/coordination above gruntwork.
+          The grader-L4 has its own L5 manager same as any other L4.
   - L6 -- queen (ruflow IS L6, not just prior art)
   - L7 -- Dispatch (Preston talks to Dispatch directly for
           operational work)
@@ -181,10 +186,13 @@ spec. Summary:
           generates SOD/EOD output; is its own AC component --
           tracked as AC-S16)
 
-Each layer's engine is independently configurable. A registry
-entry running `claude_loop_continuous` declares engines per layer
-so the stack can be mixed-model (e.g. cheap local at L4, frontier
-at L7/L8).
+Engines are configurable PER ROLE within each layer (not just per
+layer). A registry entry running `claude_loop_continuous` declares
+engines so the stack can be mixed-model -- e.g. cheap local Ollama
+for most L4 gruntwork, but Claude for the high-compute L4 grader,
+and frontier models at L7/L8. The `engines` map below shows the
+default per-layer engine; per-role overrides live in the AC
+templates/settings.json (AC-S2 / AC-S9).
 
 ```yaml
 - name: dream-work-cycle
@@ -199,7 +207,7 @@ at L7/L8).
   # (AC-S10). Each layer can use a different model or provider.
   engines:
     L4: ollama-qwen2.5-coder    # gruntwork, runs locally, $0
-    L5: claude-haiku            # guiding + grading
+    L5: claude-haiku            # managers + guides for L4s
     L6: claude-sonnet           # queen (ruflow)
     L7: claude-opus             # Dispatch (Preston interface)
     L8: claude-opus             # PM (Preston PM interface)

@@ -31,7 +31,7 @@ clarification.**
    Schema spec: see `automation-registry-schema-v2.md` ->
    `claude_desktop_scheduled` -> state-aware flavour.
 2. **`claude_loop_continuous` runs the L8-L4 hierarchy, not a
-   single Claude instance.** L4 gruntwork / L5 guiding+grading /
+   single Claude instance.** L4 gruntwork (coder, qa, playtester, grader) / L5 managers+guides /
    L6 ruflow queen / L7 Dispatch (Preston's operational interface)
    / L8 PM (Preston's oversight interface). Each layer's engine is
    independently configured. Reference: research `c1779970`
