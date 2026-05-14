@@ -20,10 +20,15 @@ from typing import Any
 SUPPORTED_MECHANISMS = frozenset({
     "cron", "claude_hook", "claude_loop", "manual",
     "executor", "claude_check", "claude_blocker_callback",
+    # Schema v2 tier reshape (2026-05-14).
+    "claude_desktop_scheduled",
+    "claude_loop_continuous",
+    "claude_routine",
 })
 
 SUPPORTED_TARGET_KINDS = frozenset({
     "python_callable", "shell", "http", "mcp", "agent_role",
+    "claude_prompt",  # schema v2 -- routine + loop_continuous
 })
 
 SUPPORTED_CHANNELS = frozenset({
@@ -64,6 +69,11 @@ class Automation:
     executor_ref: dict | None = None
     pre_dispatch_hooks: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
+    # Schema v2 additions.
+    trigger: dict | None = None          # state-aware triggers (Desktop scheduled)
+    engines: dict | None = None          # per-layer engine map (loop_continuous)
+    goal_template: str | None = None     # /goal text (loop_continuous + AR-S3j)
+    limit_aware: dict | None = None      # pause_at_remaining_pct etc.
     # Original dict preserved for handlers that want fields not yet
     # promoted to dataclass attributes.
     raw: dict = field(default_factory=dict)
@@ -137,6 +147,7 @@ def validate_entry(raw: dict, index: int) -> Automation:
         raise SchemaError(f"{path}.enabled: must be a boolean")
 
     schedule = raw.get("schedule")
+    trigger = raw.get("trigger")
     if mechanism == "cron" and not schedule:
         raise SchemaError(
             f"{path}: mechanism=cron requires a non-null schedule"
@@ -146,6 +157,44 @@ def validate_entry(raw: dict, index: int) -> Automation:
             f"{path}: mechanism=claude_hook requires schedule "
             "(the hook event name)"
         )
+    if mechanism == "claude_desktop_scheduled":
+        # Two flavours: time-of-day (schedule non-null) or state-aware
+        # (trigger.kind == 'state'). Exactly one.
+        has_sched = bool(schedule)
+        has_state = isinstance(trigger, dict) and trigger.get("kind") == "state"
+        if has_sched and has_state:
+            raise SchemaError(
+                f"{path}: claude_desktop_scheduled cannot have BOTH a "
+                "non-null schedule AND a state-aware trigger; pick one"
+            )
+        if not (has_sched or has_state):
+            raise SchemaError(
+                f"{path}: claude_desktop_scheduled requires either a "
+                "non-null schedule (time-of-day) OR a trigger with "
+                "kind: state (state-aware)"
+            )
+        if has_state:
+            required_trigger_fields = ("fire_when", "after_event",
+                                        "state_file", "on_fire_update")
+            for f in required_trigger_fields:
+                if not trigger.get(f):
+                    raise SchemaError(
+                        f"{path}.trigger: state-aware requires "
+                        f"non-empty {f!r}"
+                    )
+
+    engines = raw.get("engines")
+    if mechanism == "claude_loop_continuous":
+        if schedule is not None:
+            raise SchemaError(
+                f"{path}: claude_loop_continuous must have "
+                "schedule: null (not cron-scheduled)"
+            )
+        if not isinstance(engines, dict):
+            raise SchemaError(
+                f"{path}: claude_loop_continuous requires engines map "
+                "(L4..L8 -> engine id)"
+            )
 
     unblock_condition = raw.get("unblock_condition")
     if mechanism == "claude_blocker_callback":
@@ -203,6 +252,10 @@ def validate_entry(raw: dict, index: int) -> Automation:
         executor_ref=executor_ref,
         pre_dispatch_hooks=list(pre_hooks),
         tags=list(tags),
+        trigger=trigger if isinstance(trigger, dict) else None,
+        engines=engines if isinstance(engines, dict) else None,
+        goal_template=raw.get("goal_template"),
+        limit_aware=raw.get("limit_aware"),
         escalation=escalation,
         enabled=bool(enabled),
         raw=raw,

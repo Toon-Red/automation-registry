@@ -24,7 +24,7 @@ import sys
 import time
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 log = logging.getLogger("automation-registry")
@@ -109,6 +109,37 @@ def escalate_endpoint() -> dict:
         yaml_path=REGISTRY_YAML, db_path=REGISTRY_DB,
     )
     return out.as_dict()
+
+
+# -- Desktop scheduled mechanism endpoints (AR-S3g) -----------------
+
+@app.get("/api/registry/desktop_scheduled")
+def list_desktop_scheduled() -> dict:
+    """Return the sqlite-backed list of Desktop scheduled entries."""
+    import desktop_scheduled_handler as dsh
+    return {"entries": dsh.list_installed(REGISTRY_DB)}
+
+
+@app.post("/api/registry/desktop_scheduled/reconcile")
+def reconcile_desktop_scheduled() -> dict:
+    """Reconcile yaml-desired vs sqlite-known state for the
+    claude_desktop_scheduled mechanism. Time-of-day entries return
+    pending MCP ops the operator (or L8 agent) materialises;
+    state-aware entries install/update their SessionStart hooks
+    directly. Idempotent."""
+    import desktop_scheduled_handler as dsh
+    return dsh.reconcile(REGISTRY_YAML, REGISTRY_DB).as_dict()
+
+
+@app.post("/api/registry/desktop_scheduled/ack")
+async def ack_desktop_scheduled(request: Request) -> dict:
+    """Operator confirms a set of time-of-day MCP ops were applied
+    successfully. Body: {task_ids: [name, ...]}."""
+    import desktop_scheduled_handler as dsh
+    body = await request.json()
+    task_ids = body.get("task_ids") or []
+    count = dsh.ack_applied(REGISTRY_DB, task_ids)
+    return {"acknowledged": count, "task_ids": task_ids}
 
 
 def main() -> int:
