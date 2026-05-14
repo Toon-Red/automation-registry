@@ -45,6 +45,35 @@ PORT=5050 python app.py        # env override
 pytest                         # tests
 ```
 
+## Runner CLI (AR-S3c)
+
+`runner.py` is the entry point platform-scheduled tasks invoke when
+their cron schedule fires. Self-contained; not a server.
+
+```bash
+python runner.py --entry <name>            # fire one registry entry
+python runner.py --entry <name> --dry-run  # log + resolve, no spawn/state
+python runner.py --entry <name> --manual   # tag run as operator-initiated
+python -m runner --entry <name>            # equivalent module form
+```
+
+Behaviour: acquires an advisory lock at `data/locks/<name>.lock`,
+writes a `running` row to `cron_runs`, dispatches the target via
+subprocess (per Q-B: subprocess for owner-project repo isolation),
+captures stdout/stderr/exit, updates the row to `succeeded` /
+`failed`, and exits with the target's exit code. **AR-S3c does NOT
+fire the escalation pipeline** on failure -- that's AR-S3d's job.
+
+Target-kind dispatch:
+
+| `target_kind` | Behaviour |
+|---|---|
+| `python_callable` | Subprocess of `python -c "from <module> import <fn>; <fn>()"` with `cwd` = owner_project's repo. |
+| `shell` | Subprocess of the literal target with `cwd` = owner_project's repo. |
+| `http` | stdlib `urllib` POST to the URL. |
+| `mcp` | NotImplementedError until the MCP client lands (post-AR-S3). |
+| `agent_role` | NotImplementedError until AC-S10 (multi-engine driver). |
+
 ## References
 
 - **Research:** PD `fe0302b9` -- decision + REUSE-AS-EXECUTOR framework.
