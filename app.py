@@ -100,6 +100,17 @@ def reconcile_endpoint() -> dict:
     return result.as_dict()
 
 
+@app.post("/api/registry/escalate")
+def escalate_endpoint() -> dict:
+    """Run one escalation pass. Returns the per-action counts.
+    Idempotent -- already-escalated rows are skipped."""
+    import escalator
+    out = escalator.process_failed_runs(
+        yaml_path=REGISTRY_YAML, db_path=REGISTRY_DB,
+    )
+    return out.as_dict()
+
+
 def main() -> int:
     """Cross-platform entry point. PORT env wins, then --port, then default."""
     parser = argparse.ArgumentParser(description="Automation Registry skeleton")
