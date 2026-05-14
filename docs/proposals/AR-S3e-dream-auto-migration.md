@@ -12,20 +12,37 @@
 
 After the Phase 1 subscription-cost verification (Pro/Max cover all
 three Claude scheduling features; no extra cost), the migration
-targets reshape:
+targets reshape. **2026-05-13 update: SOD/EOD use STATE-AWARE
+triggers (not fixed time-of-day) per Preston's state-machine
+clarification.**
 
-| Old (v1 plan) | New (v2 plan) |
+| Old (v1 plan) | New (revised) |
 |---|---|
-| `dream-morning-summary` cron `0 8 * * *` -> orchestrator:run_morning | `dream-morning-summary` **`claude_desktop_scheduled`** `0 8 * * *` -> run_morning |
-| `dream-eod-review` cron `0 18 * * *` -> orchestrator:run_eod | `dream-eod-review` **`claude_desktop_scheduled`** `0 18 * * *` -> run_eod |
-| `dream-work-cycle` cron `0 9-17 * * 1-5` -> orchestrator:run_work_cycle | `dream-work-cycle` **`claude_loop_continuous`** -> run_work_cycle (NOT cron-scheduled; continuous until limit) |
+| cron `0 8 * * *` -> run_morning | `dream-morning-summary` **`claude_desktop_scheduled` state-aware** (fires on session-open past midnight when SOD not yet run today) -> run_morning |
+| cron `0 18 * * *` -> run_eod | `dream-eod-review` **`claude_desktop_scheduled` state-aware** (fires when SOD ran today AND hour >= 17 AND EOD not yet run) -> run_eod |
+| cron `0 9-17 * * 1-5` -> run_work_cycle | `dream-work-cycle` **`claude_loop_continuous`** -> the L8-L4 hierarchy runtime (NOT "a Claude in a loop"). Engines per layer; runs until limit + auto-resume on reset. |
 
-The work-cycle change is the meaningful architectural shift:
-hourly fires become continuous limit-aware operation. Per Preston:
-"run till the limit is hit, or near. This way you actually fully
-utilize what you can." The auto-resume infrastructure is part of
-the `claude_loop_continuous` backend (see
-`AR-S3-limit-aware-resume.md`).
+**Critical clarifications:**
+
+1. **SOD/EOD are state transitions, not clock events.** SOD always
+   before EOD within a day. Missed yesterday's EOD: SKIPPED, not
+   caught up. State persisted at `automation-registry/data/
+   workflow_state.json` with `last_sod_date` / `last_eod_date`.
+   Schema spec: see `automation-registry-schema-v2.md` ->
+   `claude_desktop_scheduled` -> state-aware flavour.
+2. **`claude_loop_continuous` runs the L8-L4 hierarchy, not a
+   single Claude instance.** L4 gruntwork / L5 guiding+grading /
+   L6 ruflow queen / L7 Dispatch (Preston's operational interface)
+   / L8 PM (Preston's oversight interface). Each layer's engine is
+   independently configured. Reference: research `c1779970`
+   (agent-controller) 2026-05-13 amendment.
+3. The work-cycle change is the meaningful architectural shift:
+   hourly fires become **continuous L8-L4 stack operation**, paused
+   on credit, resumed on reset. Per Preston: "run till the limit is
+   hit, or near. This way you actually fully utilize what you can."
+   Auto-resume infrastructure: session-start read of
+   `x-ratelimit-reset` (see revised
+   `AR-S3-limit-aware-resume.md`).
 
 Sub-task changes:
   * **Cron backend (AR-S3a..d) stays as Tier 4 fallback.** Not

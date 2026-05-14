@@ -25,6 +25,32 @@ A daemon-shaped runtime that:
    idle, kick off the next iteration. If working, do nothing this
    tick -- check again on the next heartbeat.
 
+## Detection model -- REVISED 2026-05-13 (session-start read)
+
+**Preston clarification 2026-05-13: timer is session-start, not
+limit-hit.** Read `x-ratelimit-reset` (or equivalent) from any API
+response at session startup; persist; schedule a timer for that
+moment. When the timer fires, run the idle check (Q-B) and either
+resume or do nothing. No Stop-hook machinery needed.
+
+Flow:
+
+  1. Session starts -> `automation-registry` makes a tiny harmless
+     Anthropic API call (e.g. a 1-token completion or a metadata
+     ping if such a thing exists) to obtain `x-ratelimit-reset` +
+     `x-ratelimit-remaining` headers.
+  2. Persist to `data/quota_state.json`:
+     `{ next_reset_ts: <iso>, remaining_at_check: <int>,
+        checked_at: <iso> }`.
+  3. Schedule a wakeup timer for `next_reset_ts`.
+  4. When timer fires: run the idle check. Resume if idle; no-op
+     if busy.
+
+The old "watch every API response via a Stop hook" design is
+dropped -- session-start is the natural detection moment because
+that's when we know we're about to start work and need to plan the
+burn window.
+
 ## Open design questions (Q-A through Q-G)
 
 These are the calls the AR-S3h implementation task makes. Most
@@ -32,23 +58,10 @@ have a tentative answer; Preston's call confirms or overrides.
 
 **Q-A: How does the loop detect "the limit just reset"?**
 
-Three candidates:
-
-  a. Poll a known Anthropic API endpoint that returns remaining
-     quota + reset timestamp.
-  b. Parse the response headers of a Claude API call. Anthropic's
-     `x-ratelimit-*` headers carry remaining tokens + reset.
-  c. Schedule a wakeup at the predicted reset time and verify by
-     attempting a tiny test call.
-
-  Tentative: **(b)** -- piggyback on real calls. No extra polling
-  cost. The Stop-hook protocol Claude Code uses already exposes the
-  raw response; we wrap it. If the test call still 429s, retry with
-  exponential backoff.
-
-  **Needs verification: does Claude Code surface the
-  `x-ratelimit-*` headers anywhere a hook can read?** If not, fall
-  back to (c).
+RESOLVED 2026-05-13: session-start read of `x-ratelimit-reset`
+header from any Anthropic API call. Persist + timer. See the
+"Detection model -- REVISED 2026-05-13" section above. The Q-MAIN
+question reframes accordingly (see bottom of doc).
 
 **Q-B: How does the loop detect "is Claude currently busy"?**
 
@@ -136,14 +149,29 @@ The loop should LOG the planned burn window at start of each
 session (the operator sees "next pause expected at HH:MM" and
 "target reset HH:MM").
 
-## Open question for Preston
+## Open question for Preston (REFRAMED 2026-05-13)
 
-**Q-MAIN: Is `x-ratelimit-*` accessible inside a Claude Code Stop
-hook?** If yes, Q-A's (b) is the implementation. If no, we need a
-side-channel (manual ping of the API at start of each iteration to
-read headers). The AR-S3h implementation task can't ship without
-this answer. Filing a research item alongside this doc to
-investigate.
+**Q-MAIN (new framing): what is the exact API surface for reading
+remaining quota + reset time at session start?**
+
+  - What's the canonical header name? `x-ratelimit-reset` is the
+    de-facto industry pattern -- confirm Anthropic uses this
+    spelling vs something like `anthropic-ratelimit-reset`.
+  - Is `remaining` token-count, request-count, or both?
+  - Reset value: epoch seconds, ISO-8601, or relative seconds?
+  - Cheapest probe call shape: is there a low-cost endpoint
+    (`/v1/models`?) that returns the same headers as a full
+    completion?
+
+This is smaller than the old "Stop-hook reachable" question --
+once answered, the implementation is straightforward (one HTTP
+call at session start, parse headers, schedule timer). Filed as
+research `e8d95bf1` with the new framing.
+
+L8-L4 hierarchy context: this detection happens once at the
+START of a `claude_loop_continuous` run. The L8-L4 stack THEN
+operates under the burn window; the timer fires only when the
+window expires + a reset arrives.
 
 ## Cross-references
 
