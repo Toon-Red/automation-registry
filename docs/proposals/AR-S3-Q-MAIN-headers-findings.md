@@ -3,6 +3,14 @@
 > Resolves the reframed Q-MAIN from
 > `AR-S3-limit-aware-resume.md`. Source: official Anthropic docs at
 > https://platform.claude.com/docs/en/api/rate-limits.md.
+>
+> **2026-05-14 UPDATE -- two-timer model finding.** Preston's Usage
+> UI screenshot shows TWO subscription timers (5h session + weekly)
+> distinct from the org-level API rate-limit headers documented
+> below. The subscription timers are **UI-only and not exposed
+> programmatically.** See the "Two-timer model" section near the
+> bottom -- this is a gap in the auto-resume design that needs
+> Preston's call before AR-S3h can ship.
 
 ## Headers (documented)
 
@@ -96,18 +104,74 @@ subscription). The loop runtime persists `QuotaState` to
 `tokens_reset` or `requests_reset` (which one is the actual
 bottleneck depends on the workload).
 
-## Q-MAIN resolution
+## Two-timer model (2026-05-14 follow-up finding)
 
-  - Headers: **documented, list above**.
-  - Format: **RFC 3339**.
-  - Cheapest probe: **`POST /v1/messages` with `max_tokens: 1`**
-    (empirical fallback test for `/v1/models` is a small AR-S3h
-    sub-step).
-  - Subscription reset: **separate concept; not API-exposed; not
-    needed for limit-aware resume**.
-  - CLI helper: **none; write our own**.
+Preston's Usage UI screenshot showed **two distinct timers**, not
+one:
 
-AR-S3h (`bd24a633`) unblocked.
+  1. **Current session** -- 31% used, "Resets in 3 hr 21 min"
+     (rolling ~5h window, the Pro/Max session cap).
+  2. **Weekly limits -- All models** -- 7% used, "Resets Tue
+     9:00 PM" (weekly absolute timestamp).
+
+Follow-up investigation (claude-code-guide agent citing
+`platform.claude.com/docs/en/api/rate-limits` +
+`platform.claude.com/docs/en/manage-claude/rate-limits-api` +
+Anthropic support article 14552983):
+
+  - The `anthropic-ratelimit-*-reset` headers documented above
+    reflect **organizational rate limits** (minute-scale
+    enforcement), **NOT the Pro/Max subscription session and
+    weekly windows** shown in the UI.
+  - The 5h session timer + weekly timer are **UI-only and
+    undocumented**. No `GET /v1/usage`, no `/v1/account`, no
+    `/v1/organizations/usage` documented.
+  - Claude Code's `/status` and `/cost` don't expose them either.
+
+### Implication for AR-S3h's auto-resume design
+
+The prior probe pseudo-code above reads
+`anthropic-ratelimit-tokens-reset` and uses that as the resume
+timer. **That value reflects org-level minute-scale rate-limit
+windows, not the subscription's 5h session window or weekly cap.**
+For Pro/Max users (Preston's actual case), the org-level header
+is rarely the binding constraint -- the 5h session and weekly are.
+
+Three options surfaced; **needs Preston's call before AR-S3h
+ships**:
+
+  (a) **User-configured timer.** Operator enters the 5h session
+      reset manually (or the daemon notes the first API call's
+      timestamp + adds 5h, since Pro/Max session windows are
+      anchored to first-use).
+  (b) **Scrape the Claude Code Desktop UI** for the two timers.
+      Brittle (DOM parsing, breaks on UI updates).
+  (c) **Empirically test**: does `anthropic-ratelimit-tokens-reset`
+      ACTUALLY reflect the 5h session for Pro/Max-billed calls,
+      or only the org-level minute window? If the former, the
+      original design works as-is. Cheapest verification: make
+      one call from a Pro/Max Claude Code session, capture the
+      header, compare to the UI's "resets in" countdown.
+
+**Claude's tentative**: (c) first (zero-cost test, may
+collapse the question), fallback (a) if (c) shows the header is
+org-level minute-window. (b) is last resort.
+
+## Q-MAIN resolution (partial)
+
+  - **Headers**: documented, list above. Real, RFC 3339, on every
+    `POST /v1/messages`. **But probably org-level, not
+    subscription-level.**
+  - **Format**: RFC 3339.
+  - **Cheapest probe**: `POST /v1/messages` with `max_tokens: 1`.
+  - **Subscription timers**: **NOT API-exposed**. Two-timer model
+    (5h session + weekly). Resolution path TBD per Preston's call
+    on (a)/(b)/(c) above.
+  - **CLI helper**: none.
+
+**AR-S3h (`bd24a633`) blocked** until the (a)/(b)/(c) call lands.
+The Desktop scheduled backend (AR-S3g, `2346412d`) remains
+unblocked and ready to dispatch.
 
 ## References
 

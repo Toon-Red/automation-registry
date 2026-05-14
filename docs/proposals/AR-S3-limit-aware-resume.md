@@ -33,6 +33,29 @@ response at session startup; persist; schedule a timer for that
 moment. When the timer fires, run the idle check (Q-B) and either
 resume or do nothing. No Stop-hook machinery needed.
 
+### 2026-05-14 follow-up: TWO timers, only one likely programmatic
+
+Preston's Usage UI shows TWO subscription timers (5h session +
+weekly absolute). Investigation finds the documented
+`anthropic-ratelimit-*-reset` headers are **org-level minute-scale
+limits**, not the Pro/Max session/weekly caps. See
+`AR-S3-Q-MAIN-headers-findings.md` -- the "Two-timer model"
+section.
+
+The auto-resume design above assumes one programmatic timer
+source. With the two-timer model, the design needs one of:
+
+  (a) User-configured timer (the operator notes the 5h reset
+      time at session start; daemon schedules off that).
+  (b) Scrape Claude Code Desktop UI for the two timers (brittle).
+  (c) Empirically verify whether `anthropic-ratelimit-tokens-reset`
+      reflects the 5h session for Pro/Max -- if it does, the
+      original design works without change.
+
+**Awaits Preston's call before AR-S3h implementation begins.**
+Recommendation: empirical test (c) first; collapses the question
+if positive.
+
 Flow:
 
   1. Session starts -> `automation-registry` makes a tiny harmless
