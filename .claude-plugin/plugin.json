@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
+  "name": "automation-registry-claude-pack",
+  "version": "0.1.0",
+  "description": "Claude Code primitives for the automation-registry app: catalog inspection, mechanism status checks, registry validation.",
+  "author": {
+    "name": "Toon-Red",
+    "email": "prl@loveathome.us",
+    "url": "https://github.com/Toon-Red/automation-registry"
+  },
+  "homepage": "https://github.com/Toon-Red/automation-registry",
+  "repository": "https://github.com/Toon-Red/automation-registry",
+  "license": "MIT",
+  "keywords": [
+    "automation",
+    "registry",
+    "catalog",
+    "scheduler",
+    "claude-code",
+    "ecosystem"
+  ],
+  "commands": ".claude/commands",
+  "skills": ".claude/skills",
+  "agents": ".claude/agents",
+  "hooks": ".claude/settings.json"
+}

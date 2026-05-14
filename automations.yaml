@@ -1,0 +1,14 @@
+# Automation Registry -- source of truth for "what is automated, when, how."
+#
+# Schema v1 is documented at docs/proposals/automation-registry-schema-v1.md.
+# This file is intentionally EMPTY at AR-S2 (skeleton). First registry
+# entries land in AR-S3 onward as each mechanism backend ships.
+#
+# Cross-references:
+#   - Research fe0302b9 (decision + REUSE-AS-EXECUTOR framework)
+#   - Phase A scoping in pipeline-dashboard/docs/audits/
+#   - Schema doc:       docs/proposals/automation-registry-schema-v1.md
+
+schema_version: 1
+
+automations: []
