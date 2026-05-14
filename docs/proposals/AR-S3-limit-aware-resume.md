@@ -56,6 +56,24 @@ source. With the two-timer model, the design needs one of:
 Recommendation: empirical test (c) first; collapses the question
 if positive.
 
+### 2026-05-14 -- AR-S3h ships covering all three
+
+While Preston's call is pending, AR-S3h ships with a probe that
+consults BOTH (a) and (c), picking the EARLIEST credible reset:
+
+  * (c) -- ``quota_probe.probe_quota`` issues the documented
+    ``POST /v1/messages`` with ``max_tokens=1`` and reads
+    ``anthropic-ratelimit-*-reset`` headers.
+  * (a) -- operator drops a flat file at
+    ``data/quota_operator.json`` (``{"next_reset_ts": "..."}``).
+  * (b) -- same flat file, populated by a future DOM scraper.
+
+Whichever boundary is earlier wins. If (c) turns out to be
+org-level-only, the operator file dominates as planned. If (c)
+actually reflects the 5h session for Pro/Max, the operator file
+is redundant noise. Either way the loop runtime has a usable
+``next_reset_ts``.
+
 Flow:
 
   1. Session starts -> `automation-registry` makes a tiny harmless

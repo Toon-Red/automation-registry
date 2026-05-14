@@ -142,6 +142,87 @@ async def ack_desktop_scheduled(request: Request) -> dict:
     return {"acknowledged": count, "task_ids": task_ids}
 
 
+# -- claude_loop_continuous endpoints (AR-S3h) ----------------------
+
+@app.get("/api/registry/loop_continuous")
+def list_loop_continuous() -> dict:
+    """Return the sqlite-backed view of claude_loop_continuous entries
+    + their pause/resume state."""
+    import loop_continuous_handler as lch
+    return {"entries": lch.list_installed(REGISTRY_DB)}
+
+
+@app.post("/api/registry/loop_continuous/reconcile")
+def reconcile_loop_continuous() -> dict:
+    """Make sqlite state match the YAML for claude_loop_continuous
+    entries. Idempotent. Does NOT spawn the L8-L4 stack -- that is
+    triggered separately via dispatch_iteration / the watchdog."""
+    import loop_continuous_handler as lch
+    return lch.reconcile(REGISTRY_YAML, REGISTRY_DB).as_dict()
+
+
+@app.post("/api/registry/loop_continuous/dispatch")
+async def dispatch_loop_continuous(request: Request) -> dict:
+    """Run ONE iteration of an entry's L8-L4 stack. Body:
+    ``{"entry_name": str}``. Returns the iteration outcome."""
+    import loop_continuous_handler as lch
+    body = await request.json()
+    name = body.get("entry_name")
+    if not name:
+        return {"error": "entry_name required"}
+    result = lch.dispatch_iteration(
+        name, yaml_path=REGISTRY_YAML, db_path=REGISTRY_DB,
+    )
+    return result.as_dict()
+
+
+@app.post("/api/registry/loop_continuous/pause")
+async def pause_loop_continuous(request: Request) -> dict:
+    """Manually pause an entry (operator can force a pause). Body:
+    ``{"entry_name": str, "reason": str}``."""
+    import loop_continuous_handler as lch
+    body = await request.json()
+    name = body.get("entry_name")
+    if not name:
+        return {"error": "entry_name required"}
+    lch.pause_entry(REGISTRY_DB, name,
+                     reason=body.get("reason") or "manual",
+                     next_reset_ts=body.get("next_reset_ts"))
+    return {"ok": True, "entry_name": name, "status": "paused"}
+
+
+@app.post("/api/registry/loop_continuous/resume")
+async def resume_loop_continuous(request: Request) -> dict:
+    """Manually resume a paused entry. Body: ``{"entry_name": str}``."""
+    import loop_continuous_handler as lch
+    body = await request.json()
+    name = body.get("entry_name")
+    if not name:
+        return {"error": "entry_name required"}
+    lch.resume_entry(REGISTRY_DB, name)
+    return {"ok": True, "entry_name": name, "status": "running"}
+
+
+@app.post("/api/registry/loop_continuous/watchdog")
+def watchdog_loop_continuous() -> dict:
+    """One pass of the watchdog (Q-F). Resumes entries whose quota
+    reset has passed; flags hung entries as crashed. Idempotent --
+    safe to call from a Desktop scheduled task on a 30-min cadence."""
+    import loop_continuous_handler as lch
+    results = lch.watchdog_check(REGISTRY_DB)
+    return {"results": [r.as_dict() for r in results]}
+
+
+@app.post("/api/registry/loop_continuous/probe_quota")
+def probe_quota_endpoint() -> dict:
+    """Run the Q-MAIN quota probe + persist the result. Returns the
+    snapshot. Uses ANTHROPIC_API_KEY from env; falls back to the
+    operator-configured timer file if absent."""
+    import quota_probe
+    state = quota_probe.probe_quota()
+    return state.as_dict()
+
+
 # -- /goal renderer (AR-S3j) ----------------------------------------
 
 @app.post("/api/registry/render_goal")
