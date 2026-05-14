@@ -1,0 +1,203 @@
+{
+  "summary": {
+    "total": 16,
+    "succeeded": 13,
+    "failed": 3,
+    "source_schedule": 14,
+    "source_manual": 2
+  },
+  "rows": [
+    {
+      "run_id": 1,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:12:01+00:00",
+      "ended_at": "2026-05-14T13:12:01+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 2,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:14:01+00:00",
+      "ended_at": "2026-05-14T13:14:01+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 3,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:16:01+00:00",
+      "ended_at": "2026-05-14T13:16:01+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 4,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:18:01+00:00",
+      "ended_at": "2026-05-14T13:18:01+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 5,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:20:01+00:00",
+      "ended_at": "2026-05-14T13:20:01+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 6,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:22:01+00:00",
+      "ended_at": "2026-05-14T13:22:01+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 7,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:24:01+00:00",
+      "ended_at": "2026-05-14T13:24:01+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 8,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:26:01+00:00",
+      "ended_at": "2026-05-14T13:26:01+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 9,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:28:01+00:00",
+      "ended_at": "2026-05-14T13:28:01+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 10,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:30:01+00:00",
+      "ended_at": "2026-05-14T13:30:01+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 11,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:32:02+00:00",
+      "ended_at": "2026-05-14T13:32:02+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 12,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:34:01+00:00",
+      "ended_at": "2026-05-14T13:34:01+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 13,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:36:01+00:00",
+      "ended_at": "2026-05-14T13:36:01+00:00",
+      "exit_code": 0,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "",
+      "status": "succeeded",
+      "source": "schedule",
+      "escalated_at": null
+    },
+    {
+      "run_id": 14,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:37:37+00:00",
+      "ended_at": "2026-05-14T13:37:37+00:00",
+      "exit_code": 1,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "  File \"<string>\", line 1\n    \"import\n    ^\nSyntaxError: unterminated string literal (detected at line 1)\n",
+      "status": "failed",
+      "source": "manual",
+      "escalated_at": "2026-05-14T13:37:56+00:00"
+    },
+    {
+      "run_id": 15,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:37:43+00:00",
+      "ended_at": "2026-05-14T13:37:43+00:00",
+      "exit_code": 1,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "  File \"<string>\", line 1\n    \"import\n    ^\nSyntaxError: unterminated string literal (detected at line 1)\n",
+      "status": "failed",
+      "source": "manual",
+      "escalated_at": "2026-05-14T13:37:56+00:00"
+    },
+    {
+      "run_id": 16,
+      "entry_name": "synthetic-cron-smoke-test",
+      "started_at": "2026-05-14T13:38:01+00:00",
+      "ended_at": "2026-05-14T13:38:01+00:00",
+      "exit_code": 1,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "  File \"<string>\", line 1\n    \"import\n    ^\nSyntaxError: unterminated string literal (detected at line 1)\n",
+      "status": "failed",
+      "source": "schedule",
+      "escalated_at": "2026-05-14T13:38:31+00:00"
+    }
+  ]
+}

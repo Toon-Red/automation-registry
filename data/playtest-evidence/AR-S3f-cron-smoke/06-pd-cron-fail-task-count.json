@@ -1,0 +1,9 @@
+{
+  "cron_fail_task_count": 1,
+  "task_ids": [
+    "25f17726"
+  ],
+  "titles": [
+    "[cron-fail] synthetic-cron-smoke-test"
+  ]
+}

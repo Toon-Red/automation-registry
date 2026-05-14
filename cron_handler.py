@@ -69,11 +69,24 @@ class ReconcileResult:
 
 def _build_cron_job(svc_mod, automation: _schema.Automation,
                      working_dir: str) -> Any:
-    """Construct supervisor.CronJob from a validated Automation entry."""
+    """Construct supervisor.CronJob from a validated Automation entry.
+
+    The supervisor's ``command`` is the argv string handed to the
+    platform scheduler. Per AR-S3c, the scheduler must invoke the
+    registry runner (which records to ``cron_runs``, acquires the
+    advisory lock, and dispatches to the entry's target) -- NOT the
+    target directly. The runner then reads the entry from
+    ``automations.yaml`` and dispatches to the correct ``target_kind``.
+
+    Surface ``runner.py --entry <name>`` rather than the bare target
+    so sqlite + escalation pipelines see every real fire. Tested in
+    AR-S3f playtest (wiki/playtests/AR-S3f-2026-05-14-cron-smoke.md).
+    """
+    runner_argv = f"runner.py --entry {automation.name}"
     return svc_mod.CronJob(
         name=automation.name,
         schedule=automation.schedule or "",
-        command=automation.target,
+        command=runner_argv,
         working_dir=working_dir,
         description=automation.description,
     )

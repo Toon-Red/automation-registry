@@ -1,0 +1,6 @@
+COMMAND: schtasks /Query /TN \Ecosystem-Cron-synthetic-cron-smoke-test
+EXIT: 1
+STDOUT: 
+STDERR: ERROR: The system cannot find the file specified.
+
+

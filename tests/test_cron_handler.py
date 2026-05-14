@@ -214,6 +214,24 @@ class TestReconcile:
         # State is recorded.
         assert _state.get_entry(db_path, "dream-eod") is not None
 
+    def test_install_surfaces_runner_argv_not_bare_target(
+        self, yaml_path, db_path
+    ):
+        """AR-S3f playtest invariant: the supervisor's ``command`` must be
+        ``runner.py --entry <name>``, NOT the raw ``target`` from YAML.
+
+        Going through runner.py is what guarantees every fire writes a row
+        to ``cron_runs`` and feeds the escalation pipeline -- the very
+        observability AR-S3f set out to prove. Regressing this is silent
+        (the cron still runs) but invisible to sqlite/PD."""
+        _write_yaml(yaml_path, _GOOD_CRON_ENTRY)
+        sup = _FakeSupervisor()
+        cron_handler.reconcile(yaml_path, db_path, supervisor=sup)
+        installed = sup.installed[0]
+        assert installed.command == "runner.py --entry dream-eod"
+        # And: the raw target must NOT be what we hand the scheduler.
+        assert "dream.orchestrator:run_eod" not in installed.command
+
     def test_idempotent_second_run_is_unchanged(self, yaml_path, db_path):
         _write_yaml(yaml_path, _GOOD_CRON_ENTRY)
         sup = _FakeSupervisor()
