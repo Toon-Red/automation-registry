@@ -40,7 +40,10 @@ def test_root_endpoint() -> None:
     assert r.status_code == 200
     body = r.json()
     assert body["name"] == "automation-registry"
-    assert "skeleton" in body["status"].lower()
+    # The status string evolves per shipped sub-task; require only that
+    # one of the known phase tokens appears.
+    status = body["status"].lower()
+    assert any(tok in status for tok in ("skeleton", "ar-s3"))
 
 
 def test_automations_yaml_parses_and_is_empty_at_skeleton() -> None:

@@ -34,6 +34,7 @@ APP_VERSION = "0.1.0"
 
 ROOT = Path(__file__).resolve().parent
 REGISTRY_YAML = ROOT / "automations.yaml"
+REGISTRY_DB = ROOT / "data" / "registry.db"
 
 _STARTED_AT = time.time()
 
@@ -76,8 +77,27 @@ def root() -> dict:
         "version": APP_VERSION,
         "docs": "/docs",
         "health": "/api/health",
-        "status": "skeleton -- AR-S2 (catalog/dispatch ships in AR-S3+)",
+        "status": "cron handler online -- AR-S3b (runner ships in AR-S3c)",
     }
+
+
+# -- Cron mechanism endpoints (AR-S3b) -----------------------------
+
+@app.get("/api/registry/cron")
+def list_cron_entries() -> dict:
+    """Return the sqlite-backed list of installed cron entries."""
+    import cron_handler
+    return {"entries": cron_handler.list_installed(REGISTRY_DB)}
+
+
+@app.post("/api/registry/reconcile")
+def reconcile_endpoint() -> dict:
+    """Make platform state match automations.yaml for cron entries.
+    Returns the diff of installs / reinstalls / unchanged / uninstalls.
+    Idempotent."""
+    import cron_handler
+    result = cron_handler.reconcile(REGISTRY_YAML, REGISTRY_DB)
+    return result.as_dict()
 
 
 def main() -> int:
