@@ -1,9 +1,46 @@
 # AR-S3e -- Dream Auto migration scoping (no migration yet)
 
+> **REVISED 2026-05-14 per Preston's tier reshape (schema v2).**
+> Migration targets MOVED from cron (Tier 4) to Tier 1 Claude-native
+> mechanisms. Old cron-based plan preserved in commit history.
+>
 > Per Preston's "always playtest, don't fake it" rule + "don't lose
 > functionality" rule: production migrations need explicit go-ahead.
-> This doc is the plan; execution is gated on Preston's sign-off,
-> particularly on the work-cycle question below.
+> This doc is the plan; execution is gated on Preston's sign-off.
+
+## 2026-05-14 REVISION: targets are now Tier 1
+
+After the Phase 1 subscription-cost verification (Pro/Max cover all
+three Claude scheduling features; no extra cost), the migration
+targets reshape:
+
+| Old (v1 plan) | New (v2 plan) |
+|---|---|
+| `dream-morning-summary` cron `0 8 * * *` -> orchestrator:run_morning | `dream-morning-summary` **`claude_desktop_scheduled`** `0 8 * * *` -> run_morning |
+| `dream-eod-review` cron `0 18 * * *` -> orchestrator:run_eod | `dream-eod-review` **`claude_desktop_scheduled`** `0 18 * * *` -> run_eod |
+| `dream-work-cycle` cron `0 9-17 * * 1-5` -> orchestrator:run_work_cycle | `dream-work-cycle` **`claude_loop_continuous`** -> run_work_cycle (NOT cron-scheduled; continuous until limit) |
+
+The work-cycle change is the meaningful architectural shift:
+hourly fires become continuous limit-aware operation. Per Preston:
+"run till the limit is hit, or near. This way you actually fully
+utilize what you can." The auto-resume infrastructure is part of
+the `claude_loop_continuous` backend (see
+`AR-S3-limit-aware-resume.md`).
+
+Sub-task changes:
+  * **Cron backend (AR-S3a..d) stays as Tier 4 fallback.** Not
+    deprecated. Useful for sub-hour / no-Desktop-required cases.
+  * **AR-S3e blocks on AR-S3g + AR-S3h** (the Tier 1 backends) --
+    those need to ship before this migration can execute. Filed.
+  * The 5-step reversible migration plan below remains structurally
+    valid; substitute "register new entries" for "POST reconcile"
+    once the new backends exist.
+
+The Dream Auto observation: still PT30M cadence, defaults to
+`run_auto`, runs morning + cycle-loop + EOD. Migration retires it.
+Section "Dream Auto today" below is unchanged.
+
+---
 
 ## Dream Auto today -- actual behaviour
 
