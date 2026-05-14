@@ -168,8 +168,10 @@ in the registry's sqlite.
 **L8-L4 hierarchy** as a continuously-operating stack as long as
 there is calendar work AND subscription credit. The L-layer
 definitions live in research `c1779970` (agent-controller, AC) --
-see the 2026-05-13 L-hierarchy amendment for the canonical role
-spec. Summary:
+see the 2026-05-13 CORRECTION + AMENDMENT blocks for the canonical
+role spec. The CORRECTION block places grader at L4 (high-compute);
+any 'L5 grader' or 'guiding + grading' framing earlier in that
+research item is superseded. Summary:
 
   - L4 -- gruntwork: coder, qa, playtester, AND grader. Grader is
           a HIGH-COMPUTE L4 (uses a stronger engine like Claude;
