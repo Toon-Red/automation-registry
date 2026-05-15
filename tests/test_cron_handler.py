@@ -149,6 +149,30 @@ class TestSchemaLoader:
         with pytest.raises(_schema.SchemaError, match="schema_version"):
             _schema.load_automations(yaml_path)
 
+    # ----- AR-S3e: external (catalog-only) entries ---------------------
+    def test_external_defaults_to_false(self, yaml_path):
+        _write_yaml(yaml_path, _GOOD_CRON_ENTRY)
+        out = _schema.load_automations(yaml_path)
+        assert out[0].external is False
+
+    def test_external_true_parses(self, yaml_path):
+        body = _GOOD_CRON_ENTRY.replace(
+            "    enabled: true",
+            "    external: true\n    enabled: true",
+        )
+        _write_yaml(yaml_path, body)
+        out = _schema.load_automations(yaml_path)
+        assert out[0].external is True
+
+    def test_external_non_bool_rejected(self, yaml_path):
+        body = _GOOD_CRON_ENTRY.replace(
+            "    enabled: true",
+            "    external: \"yes\"\n    enabled: true",
+        )
+        _write_yaml(yaml_path, body)
+        with pytest.raises(_schema.SchemaError, match="external"):
+            _schema.load_automations(yaml_path)
+
 
 # ---------------------------------------------------------------------------
 # SQLite state layer
@@ -277,6 +301,79 @@ class TestReconcile:
         result = cron_handler.reconcile(yaml_path, db_path, supervisor=sup2)
         assert result.uninstalled == ["dream-eod"]
         assert sup2.uninstalled == ["dream-eod"]
+
+    # ----- AR-S3e: external entries are observed-only ------------------
+    _EXTERNAL_CRON_ENTRY = """\
+schema_version: 1
+automations:
+  - name: dream-auto
+    description: Existing Windows schtask; registry observes only.
+    owner_project: dream
+    target: dream/orchestrator.py:run_auto
+    target_kind: python_callable
+    mechanism: cron
+    schedule: PT30M
+    external: true
+    escalation:
+      channel: log_only
+      on_failure: log_only
+    enabled: true
+"""
+
+    def test_external_entry_not_installed(self, yaml_path, db_path):
+        _write_yaml(yaml_path, self._EXTERNAL_CRON_ENTRY)
+        sup = _FakeSupervisor()
+        result = cron_handler.reconcile(yaml_path, db_path, supervisor=sup)
+        assert sup.installed == []
+        assert sup.uninstalled == []
+        assert result.installed == []
+        assert result.observed_external == ["dream-auto"]
+        # And sqlite does NOT learn about it -- the registry doesn't own it.
+        assert _state.get_entry(db_path, "dream-auto") is None
+
+    def test_external_entry_not_uninstalled_when_removed(
+        self, yaml_path, db_path
+    ):
+        """If the entry was external on the previous reconcile, removing
+        it from the YAML must not trigger an uninstall (it was never
+        installed to begin with) and the supervisor must not be touched."""
+        _write_yaml(yaml_path, self._EXTERNAL_CRON_ENTRY)
+        cron_handler.reconcile(yaml_path, db_path, supervisor=_FakeSupervisor())
+        _write_yaml(yaml_path, "schema_version: 1\nautomations: []\n")
+        sup2 = _FakeSupervisor()
+        result = cron_handler.reconcile(yaml_path, db_path, supervisor=sup2)
+        assert sup2.uninstalled == []
+        assert result.uninstalled == []
+
+    def test_external_entry_shows_up_in_list_external(self, yaml_path):
+        _write_yaml(yaml_path, self._EXTERNAL_CRON_ENTRY)
+        out = cron_handler.list_external(yaml_path)
+        assert len(out) == 1
+        assert out[0]["name"] == "dream-auto"
+        assert out[0]["external"] is True
+        assert out[0]["owner_project"] == "dream"
+
+    def test_external_entry_does_not_appear_in_list_installed(
+        self, yaml_path, db_path
+    ):
+        _write_yaml(yaml_path, self._EXTERNAL_CRON_ENTRY)
+        cron_handler.reconcile(yaml_path, db_path, supervisor=_FakeSupervisor())
+        assert cron_handler.list_installed(db_path) == []
+
+    def test_mixed_managed_and_external(self, yaml_path, db_path):
+        """A managed cron entry and an external one in the same YAML --
+        the managed one installs, the external one is observed, neither
+        interferes with the other on prune passes."""
+        body = self._EXTERNAL_CRON_ENTRY + _GOOD_CRON_ENTRY.split(
+            "automations:\n", 1
+        )[1]
+        _write_yaml(yaml_path, body)
+        sup = _FakeSupervisor()
+        result = cron_handler.reconcile(yaml_path, db_path, supervisor=sup)
+        assert result.installed == ["dream-eod"]
+        assert result.observed_external == ["dream-auto"]
+        # Only the managed entry reached the supervisor.
+        assert [j.name for j in sup.installed] == ["dream-eod"]
 
     def test_non_cron_entries_ignored(self, yaml_path, db_path):
         body = _GOOD_CRON_ENTRY + """\

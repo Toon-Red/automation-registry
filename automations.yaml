@@ -1,6 +1,7 @@
 # Automation Registry -- source of truth for "what is automated, when, how."
 #
 # Schema v1 is documented at docs/proposals/automation-registry-schema-v1.md.
+# Schema v2 additions documented at docs/proposals/automation-registry-schema-v2.md.
 #
 # Cross-references:
 #   - Research fe0302b9 (decision + REUSE-AS-EXECUTOR framework)
@@ -15,4 +16,29 @@
 
 schema_version: 1
 
-automations: []
+automations:
+  # AR-S3e (2026-05-14, Frugality reframe): catalog-only entry for the
+  # existing Windows schtask "Dream Auto". The registry does NOT manage
+  # this entry's lifecycle -- the schtask is owned by Dream and was the
+  # de-facto parallel-autopilot identified in
+  # pipeline-dashboard/docs/audits/2026-05-13-parallel-autopilot-investigation.md.
+  # `external: true` makes the cron_handler skip install / reinstall /
+  # uninstall while keeping the entry visible in GET /api/registry/cron.
+  - name: dream-auto
+    description: |
+      Dream's 30-minute autopilot. Spawns a fresh subprocess via
+      spawn-swarm.py each fire so quota / context state is reset. Owned
+      by the Windows schtask of the same name; registry observes only.
+    owner_project: dream
+    target: dream/orchestrator.py:run_auto
+    target_kind: python_callable
+    mechanism: cron
+    schedule: PT30M
+    external: true
+    enabled: true
+    escalation:
+      channel: log_only
+      on_failure: log_only
+    tags:
+      - autopilot
+      - external

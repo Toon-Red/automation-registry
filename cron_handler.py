@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
@@ -56,6 +56,11 @@ class ReconcileResult:
     unchanged: list[str]
     uninstalled: list[str]
     skipped: list[str]  # disabled entries that weren't installed before
+    # AR-S3e: external entries are catalog-only -- registry observes them
+    # but never installs / uninstalls. The reconcile pass records them
+    # here so operators can see "yes the registry sees you" without
+    # leaking them into installed/unchanged (which imply ownership).
+    observed_external: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -64,6 +69,7 @@ class ReconcileResult:
             "unchanged": list(self.unchanged),
             "uninstalled": list(self.uninstalled),
             "skipped": list(self.skipped),
+            "observed_external": list(self.observed_external),
         }
 
 
@@ -125,7 +131,14 @@ def reconcile(
     automations = _schema.load_automations(yaml_path)
     cron_entries = [a for a in automations if a.mechanism == "cron"]
 
-    desired_names = {a.name for a in cron_entries}
+    # AR-S3e: external entries are observed-only; they never reach the
+    # supervisor and they don't count toward the prune set (their sqlite
+    # row, if any, would have been written by an earlier non-external
+    # state of the entry -- we leave that to the operator to clean up).
+    managed = [a for a in cron_entries if not a.external]
+    external = [a for a in cron_entries if a.external]
+
+    desired_names = {a.name for a in managed}
     existing_rows = {r.name: r for r in _state.list_entries(db_path)}
 
     if working_dir_resolver is None:
@@ -134,9 +147,10 @@ def reconcile(
             return str(registry_root)
 
     result = ReconcileResult([], [], [], [], [])
+    result.observed_external = [a.name for a in external]
 
     # -- Pass 1: process every desired entry ------------------------
-    for auto in cron_entries:
+    for auto in managed:
         wd = working_dir_resolver(auto)
         if not auto.enabled:
             if auto.name in existing_rows:
@@ -189,7 +203,11 @@ def _uninstall_one(svc_mod, db_path: Path | str, name: str) -> None:
 
 
 def list_installed(db_path: Path | str) -> list[dict[str, Any]]:
-    """Return the current sqlite view of installed cron entries."""
+    """Return the current sqlite view of installed cron entries.
+
+    External (AR-S3e) entries are NOT in sqlite -- the registry never
+    installs them. Use :func:`list_external` to surface those.
+    """
     rows = _state.list_entries(db_path)
     return [
         {
@@ -204,4 +222,26 @@ def list_installed(db_path: Path | str) -> list[dict[str, Any]]:
             "status": r.status,
         }
         for r in rows
+    ]
+
+
+def list_external(yaml_path: Path | str) -> list[dict[str, Any]]:
+    """Return catalog-only cron entries (AR-S3e ``external: true``).
+
+    These exist for visibility -- the registry does not own their
+    schedule. The data here comes straight from automations.yaml.
+    """
+    automations = _schema.load_automations(yaml_path)
+    return [
+        {
+            "name": a.name,
+            "schedule": a.schedule,
+            "target": a.target,
+            "owner_project": a.owner_project,
+            "description": a.description,
+            "enabled": a.enabled,
+            "external": True,
+        }
+        for a in automations
+        if a.mechanism == "cron" and a.external
     ]

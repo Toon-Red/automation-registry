@@ -46,9 +46,17 @@ def test_root_endpoint() -> None:
     assert any(tok in status for tok in ("skeleton", "ar-s3"))
 
 
-def test_automations_yaml_parses_and_is_empty_at_skeleton() -> None:
+def test_automations_yaml_parses_against_v1_schema() -> None:
+    """The YAML must be valid v1 and contain only entries the validator
+    accepts. Originally enforced ``automations == []`` at the skeleton
+    phase; relaxed in AR-S3e once the dream-auto catalog-only entry
+    landed."""
     yaml_path = Path(registry_app.__file__).resolve().parent / "automations.yaml"
     assert yaml_path.is_file()
     data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
     assert data["schema_version"] == 1
-    assert data["automations"] == []
+    assert isinstance(data["automations"], list)
+    # Every entry passes the validator (round-trips via load_automations).
+    import schema as _schema
+    out = _schema.load_automations(yaml_path)
+    assert len(out) == len(data["automations"])

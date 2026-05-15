@@ -74,6 +74,12 @@ class Automation:
     engines: dict | None = None          # per-layer engine map (loop_continuous)
     goal_template: str | None = None     # /goal text (loop_continuous + AR-S3j)
     limit_aware: dict | None = None      # pause_at_remaining_pct etc.
+    # AR-S3e: catalog-only entries (registry observes but does not manage).
+    # When true the cron handler short-circuits install / reinstall /
+    # uninstall for this entry -- it stays visible in listings and the
+    # runs table can still record observed fires, but lifecycle management
+    # belongs to whoever owns the external schedule.
+    external: bool = False
     # Original dict preserved for handlers that want fields not yet
     # promoted to dataclass attributes.
     raw: dict = field(default_factory=dict)
@@ -240,6 +246,10 @@ def validate_entry(raw: dict, index: int) -> Automation:
     if not isinstance(tags, list):
         raise SchemaError(f"{path}.tags: must be a list")
 
+    external = raw.get("external", False)
+    if not isinstance(external, bool):
+        raise SchemaError(f"{path}.external: must be a boolean")
+
     return Automation(
         name=name,
         description=description,
@@ -256,6 +266,7 @@ def validate_entry(raw: dict, index: int) -> Automation:
         engines=engines if isinstance(engines, dict) else None,
         goal_template=raw.get("goal_template"),
         limit_aware=raw.get("limit_aware"),
+        external=external,
         escalation=escalation,
         enabled=bool(enabled),
         raw=raw,
