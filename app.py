@@ -226,6 +226,86 @@ def probe_quota_endpoint() -> dict:
     return state.as_dict()
 
 
+# -- Smart auto-resume endpoints (AR-S3k) ---------------------------
+
+@app.get("/api/registry/smart_resume")
+def list_smart_resume() -> dict:
+    """Return all currently-pending (and recently-fired/cancelled)
+    one-shot resume timers. The Pipeline Dashboard renders this beside
+    each entry so the operator can see what the registry is waiting on
+    AND verify that no fixed-interval polling is happening during a
+    locked-out window."""
+    import smart_resume
+    return {
+        "pending": smart_resume.list_pending(REGISTRY_DB,
+                                              status="pending"),
+        "history": smart_resume.list_pending(REGISTRY_DB,
+                                              status=("fired", "cancelled")),
+    }
+
+
+@app.get("/api/registry/smart_resume/status/{entry_name}")
+def smart_resume_status(entry_name: str) -> dict:
+    """Compact status for a single entry -- has_pending, fire_at,
+    seconds_until_fire. Used by the Dashboard's per-entry chip."""
+    import smart_resume
+    return smart_resume.status(entry_name, db_path=REGISTRY_DB).as_dict()
+
+
+@app.post("/api/registry/smart_resume/schedule")
+async def smart_resume_schedule(request: Request) -> dict:
+    """Compute fire_at = next_reset_ts + buffer from the persisted quota
+    probe state and install (or replace) a one-shot resume timer.
+
+    Body: ``{"entry_name": str,
+              "buffer_seconds": int (optional, default 60)}``.
+
+    Errors with HTTP 200 + ``{"error": "..."}`` if no probe state is on
+    disk yet -- the operator should hit
+    ``POST /api/registry/loop_continuous/probe_quota`` first."""
+    import smart_resume
+    import quota_probe
+    body = await request.json()
+    name = body.get("entry_name")
+    if not name:
+        return {"error": "entry_name required"}
+    buf = int(body.get("buffer_seconds") or smart_resume.DEFAULT_BUFFER_SECONDS)
+    try:
+        result = smart_resume.apply_from_quota_state(
+            name, db_path=REGISTRY_DB, buffer_seconds=buf,
+        )
+    except quota_probe.QuotaProbeError as exc:
+        return {"error": str(exc)}
+    return result.as_dict()
+
+
+@app.post("/api/registry/smart_resume/cancel")
+async def smart_resume_cancel(request: Request) -> dict:
+    """Cancel any pending one-shot for ``entry_name``. Idempotent --
+    returns ``cancelled: False`` if nothing was waiting."""
+    import smart_resume
+    body = await request.json()
+    name = body.get("entry_name")
+    if not name:
+        return {"error": "entry_name required"}
+    cancelled = smart_resume.cancel_resume(name, db_path=REGISTRY_DB)
+    return {"entry_name": name, "cancelled": cancelled}
+
+
+@app.post("/api/registry/smart_resume/mark_fired")
+async def smart_resume_mark_fired(request: Request) -> dict:
+    """Record that an installed one-shot actually fired. Called by the
+    runner (or by the operator if a manual fire happened) so the
+    sqlite-backed history reflects reality."""
+    import smart_resume
+    body = await request.json()
+    name = body.get("entry_name")
+    if not name:
+        return {"error": "entry_name required"}
+    smart_resume.mark_fired(name, db_path=REGISTRY_DB)
+    return {"entry_name": name, "status": "fired"}
+
+
 # -- claude_routine endpoints (AR-S3i, deferred stub) ---------------
 
 @app.get("/api/registry/routine")
