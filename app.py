@@ -77,7 +77,10 @@ def root() -> dict:
         "version": APP_VERSION,
         "docs": "/docs",
         "health": "/api/health",
-        "status": "cron handler online -- AR-S3b (runner ships in AR-S3c)",
+        "status": (
+            "cron handler online -- AR-S3b (runner ships in AR-S3c); "
+            "claude_routine surface online as deferred stub -- AR-S3i"
+        ),
     }
 
 
@@ -221,6 +224,32 @@ def probe_quota_endpoint() -> dict:
     import quota_probe
     state = quota_probe.probe_quota()
     return state.as_dict()
+
+
+# -- claude_routine endpoints (AR-S3i, deferred stub) ---------------
+
+@app.get("/api/registry/routine")
+def list_routine() -> dict:
+    """Return the sqlite-backed view of claude_routine entries the
+    registry has seen. AR-S3i ships as a deferred stub -- rows are
+    recorded with ``status: deferred`` until a real Routines client is
+    wired into the reconcile pass (Q-PRESTON)."""
+    import routine_handler as rh
+    return {"entries": rh.list_installed(REGISTRY_DB)}
+
+
+@app.post("/api/registry/routine/reconcile")
+def reconcile_routine() -> dict:
+    """Make sqlite state match the YAML for claude_routine entries.
+
+    Idempotent. AR-S3i intentionally ships without a real Routines API
+    client -- every desired entry lands in ``deferred`` with a matching
+    ``PendingRoutineOp`` describing what the operator (or the activated
+    backend) would need to apply via the ``schedule`` skill. Once
+    Q-PRESTON closes with a routine-shaped use case, activation is a
+    one-line change: inject a concrete ``RoutinesClient`` here."""
+    import routine_handler as rh
+    return rh.reconcile(REGISTRY_YAML, REGISTRY_DB).as_dict()
 
 
 # -- /goal renderer (AR-S3j) ----------------------------------------

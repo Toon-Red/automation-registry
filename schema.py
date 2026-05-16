@@ -85,6 +85,50 @@ class Automation:
     raw: dict = field(default_factory=dict)
 
 
+def _routine_schedule_meets_minimum(schedule: str) -> bool:
+    """Return False if the cron-style ``schedule`` clearly fires more
+    often than once per hour. AR-S3i's deferred-stub validator -- per
+    the v2 schema doc, claude_routine has a 60-minute minimum cadence.
+
+    The check is conservative: it rejects only the cases we can prove
+    are sub-hourly from the minute + hour fields alone (e.g.
+    ``*/5 * * * *`` or ``*/30 9-17 * * 1-5``). Anything we cannot
+    statically prove sub-hourly passes -- a real cloud-side reject
+    will surface at install time when the backend ships. This keeps
+    the validator path useful today without blocking legitimate
+    schedules that simply look unusual.
+    """
+    if not isinstance(schedule, str):
+        return True
+    parts = schedule.strip().split()
+    if len(parts) < 2:
+        # Macro forms like '@hourly' / '@daily' are fine; '@every 5s' is
+        # not cron-standard and falls through to the runtime check.
+        return True
+    minute_field, hour_field = parts[0], parts[1]
+    # Wildcard minute with wildcard hour means "every minute".
+    if minute_field == "*":
+        return False
+    # Step expressions in the minute field with a wildcard or range
+    # hour. ``*/N`` for N < 60 fires more than once per hour.
+    if minute_field.startswith("*/"):
+        try:
+            step = int(minute_field[2:])
+        except ValueError:
+            return True
+        if step < 60:
+            return False
+    # Comma list in the minute field with two or more distinct values.
+    if "," in minute_field:
+        values = [v for v in minute_field.split(",") if v.strip()]
+        if len(values) >= 2:
+            return False
+    # Range in the minute field implies at least two firings/hour.
+    if "-" in minute_field and not minute_field.startswith("-"):
+        return False
+    return True
+
+
 def _require(d: dict, key: str, path: str) -> Any:
     if key not in d:
         raise SchemaError(f"{path}: missing required field {key!r}")
@@ -201,6 +245,50 @@ def validate_entry(raw: dict, index: int) -> Automation:
                 f"{path}: claude_loop_continuous requires engines map "
                 "(L4..L8 -> engine id)"
             )
+
+    if mechanism == "claude_routine":
+        # Tier 2 cloud-side routine. Per the v2 schema doc:
+        #   - non-null schedule required (cloud routines are cron-driven).
+        #   - 60-minute minimum cadence: the Anthropic Routines surface
+        #     refuses sub-hourly schedules. Reject at parse time so
+        #     operators don't ship a routine that the cloud will
+        #     silently reject downstream.
+        #   - target_kind must be claude_prompt -- the routine body is a
+        #     prompt string forwarded verbatim by routine_handler. Any
+        #     other target_kind would silently misroute the entry's
+        #     ``target`` field (e.g. a shell command rendered as a
+        #     prompt), so reject at parse time.
+        if not schedule:
+            raise SchemaError(
+                f"{path}: mechanism=claude_routine requires a non-null "
+                "schedule (cloud routines are cron-driven; 1h minimum)"
+            )
+        if not _routine_schedule_meets_minimum(schedule):
+            raise SchemaError(
+                f"{path}.schedule: claude_routine requires >= 60-minute "
+                f"cadence (got {schedule!r}); cloud Routines reject "
+                "sub-hourly schedules"
+            )
+        if target_kind != "claude_prompt":
+            raise SchemaError(
+                f"{path}.target_kind: mechanism=claude_routine requires "
+                f"target_kind='claude_prompt' (got {target_kind!r}); the "
+                "routine body is a prompt string, not a python callable / "
+                "shell argv"
+            )
+
+    # Rule #5 of the v2 schema doc: target_kind=claude_prompt is only
+    # valid when the mechanism is one of the prompt-consuming Tier 1/2
+    # surfaces. Anything else would silently render the prompt as a
+    # python callable / shell argv, which is a deeply misleading bug.
+    if target_kind == "claude_prompt" and mechanism not in (
+        "claude_routine", "claude_loop_continuous",
+    ):
+        raise SchemaError(
+            f"{path}.target_kind: 'claude_prompt' only valid for "
+            "mechanism in {claude_routine, claude_loop_continuous}; "
+            f"got mechanism={mechanism!r}"
+        )
 
     unblock_condition = raw.get("unblock_condition")
     if mechanism == "claude_blocker_callback":
