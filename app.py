@@ -35,6 +35,7 @@ APP_VERSION = "0.1.0"
 ROOT = Path(__file__).resolve().parent
 REGISTRY_YAML = ROOT / "automations.yaml"
 REGISTRY_DB = ROOT / "data" / "registry.db"
+REGISTRY_QUOTA = ROOT / "data" / "quota_state.json"
 
 _STARTED_AT = time.time()
 
@@ -82,6 +83,50 @@ def root() -> dict:
             "claude_routine surface online as deferred stub -- AR-S3i"
         ),
     }
+
+
+# -- Operator-anchored quota state (AR-S3k phase A) ----------------
+
+@app.get("/api/registry/quota")
+def get_quota_state():
+    """Return the current operator-anchored quota state.
+
+    Shape: ``{"session": {"reset_at": ISO, "set_at": ISO}, "weekly": {...}}``.
+    Either key may be absent. 404 if the file doesn't exist yet.
+    """
+    from fastapi.responses import JSONResponse
+    import quota_state as _qs
+    state = _qs.load_state(REGISTRY_QUOTA)
+    if state is None:
+        return JSONResponse({"error": "no quota state recorded yet"},
+                            status_code=404)
+    return state
+
+
+@app.post("/api/registry/quota")
+async def post_quota_state(request: Request):
+    """Record a reset timestamp for one subscription window.
+
+    Body: ``{"reset_at": "ISO 8601 ts", "window_kind": "session" | "weekly"}``.
+    Idempotent on the unaffected kind. Returns the full stored state.
+    """
+    from fastapi.responses import JSONResponse
+    import quota_state as _qs
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "body must be valid JSON"},
+                            status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"error": "body must be a JSON object"},
+                            status_code=400)
+    reset_at = body.get("reset_at")
+    kind = body.get("window_kind")
+    try:
+        state = _qs.write_kind(REGISTRY_QUOTA, kind, reset_at)
+    except _qs.QuotaStateError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return state
 
 
 # -- Cron mechanism endpoints (AR-S3b) -----------------------------
