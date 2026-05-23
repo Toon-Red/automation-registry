@@ -196,7 +196,8 @@ class WindowsSchTasksScheduler:
             "/F",
         ]
         log.info("schtasks install: %s", argv)
-        proc = subprocess.run(argv, capture_output=True, text=True)
+        from windowless_subprocess import run as _wl_run  # d48d4ddb
+        proc = _wl_run(argv, capture_output=True, text=True)
         if proc.returncode != 0:
             raise RuntimeError(
                 f"schtasks install failed ({proc.returncode}): "
@@ -207,7 +208,8 @@ class WindowsSchTasksScheduler:
     def cancel(self, task_id: str) -> None:
         argv = ["schtasks", "/Delete", "/TN", task_id, "/F"]
         log.info("schtasks cancel: %s", argv)
-        proc = subprocess.run(argv, capture_output=True, text=True)
+        from windowless_subprocess import run as _wl_run  # d48d4ddb
+        proc = _wl_run(argv, capture_output=True, text=True)
         if proc.returncode != 0:
             # 'task does not exist' is fine -- cancel is idempotent.
             msg = (proc.stderr.strip() or proc.stdout.strip()).lower()

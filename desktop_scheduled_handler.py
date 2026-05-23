@@ -225,7 +225,8 @@ def main():
         return 0
 
     # Predicate true -> invoke runner.
-    proc = subprocess.run(
+    from windowless_subprocess import run as _wl_run  # d48d4ddb
+    proc = _wl_run(
         [sys.executable, str(REGISTRY_ROOT / "runner.py"),
          "--entry", ENTRY_NAME],
         cwd=str(REGISTRY_ROOT),
